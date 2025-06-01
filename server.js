@@ -26,10 +26,11 @@ app.use(session({
 }));
 
 const db = mysql.createConnection({
-    host: "localhost",
+    host: "yamanote.proxy.rlwy.net",
     user: "root",
-    password: "2100030184",
-    database: "findsubs"
+    password: "JUwBoVKMCtRJRbCYdQQCUjCoDyxjfCWv",
+    database: "railway",
+    port: 57354
 });
 
 db.connect(err => {
