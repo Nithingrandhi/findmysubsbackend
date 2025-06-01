@@ -6,6 +6,7 @@ const path = require("path");
 const session = require("express-session");
 
 const app = express();
+app.set('trust proxy', 1);
 
 app.use(cors({
     origin: 'https://findmysubsfrontend.netlify.app', // Match your frontend
