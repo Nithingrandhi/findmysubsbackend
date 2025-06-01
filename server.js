@@ -93,7 +93,7 @@ app.post("/login", (req, res) => {
 
         req.session.userId = results[0].id;
         console.log("User logged in with session userId:", req.session.userId);
-
+        res.setHeader("Access-Control-Allow-Credentials", "true");
         res.status(200).json({ message: "Login successful" });
     });
 });
