@@ -8,7 +8,7 @@ const session = require("express-session");
 const app = express();
 
 app.use(cors({
-    origin: 'https://findmysubs.netlify.app', // Match your frontend
+    origin: 'https://findmysubsfrontend.netlify.app/', // Match your frontend
     credentials: true
 }));
 
