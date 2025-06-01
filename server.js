@@ -9,7 +9,7 @@ const app = express();
 app.set('trust proxy', 1);
 
 app.use(cors({
-    origin: 'https://findmysubsfrontend.netlify.app', // Match your frontend
+    origin: 'https://findmysubscrption.netlify.app/', // Match your frontend
     credentials: true,
     methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type']
