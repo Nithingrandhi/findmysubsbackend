@@ -91,10 +91,23 @@ app.post("/login", (req, res) => {
             return res.status(401).json({ message: "Invalid credentials" });
         }
 
+        // ✅ Set session value
         req.session.userId = results[0].id;
-        console.log("User logged in with session userId:", req.session.userId);
-        res.setHeader("Access-Control-Allow-Credentials", "true");
-        res.status(200).json({ message: "Login successful" });
+
+        // ✅ Save session before responding
+        req.session.save(err => {
+            if (err) {
+                console.error("Session save error:", err);
+                return res.status(500).json({ message: "Session save failed" });
+            }
+
+            console.log("Session saved. User ID:", req.session.userId);
+
+            // Optional: You can still include this header
+            res.setHeader("Access-Control-Allow-Credentials", "true");
+
+            res.status(200).json({ message: "Login successful" });
+        });
     });
 });
 
