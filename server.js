@@ -9,7 +9,7 @@ const app = express();
 app.use(express.static(path.join(__dirname, "../frontend")));
 
 app.use(cors({
-    origin: 'https://github.com/Nithingrandhi/findmysubsbackend.git', // Match your frontend
+    origin: 'https://findmysubs.netlify.app/', // Match your frontend
     credentials: true
 }));
 
