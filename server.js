@@ -6,10 +6,9 @@ const path = require("path");
 const session = require("express-session");
 
 const app = express();
-app.use(express.static(path.join(__dirname, "../frontend")));
 
 app.use(cors({
-    origin: 'https://findmysubs.netlify.app/', // Match your frontend
+    origin: 'https://findmysubs.netlify.app', // Match your frontend
     credentials: true
 }));
 
@@ -22,7 +21,12 @@ app.use(bodyParser.json());
 app.use(session({
     secret: '2100030184',
     resave: false,
-    saveUninitialized: false
+    saveUninitialized: false,
+    cookie: {
+      sameSite: 'none', // Allow cross-site cookies
+      secure: true      // Require HTTPS (your backend should use HTTPS)
+    }
+
 }));
 
 const db = mysql.createConnection({
@@ -197,12 +201,10 @@ app.get("/renewals", (req, res) => {
   });
 });
 
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "../frontend/home.html"));
-});
+
 
 // ✅ Start server
 const PORT = 5001;
 app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`Server running on ${PORT}`);
 });
