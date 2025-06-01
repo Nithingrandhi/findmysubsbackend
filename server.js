@@ -9,7 +9,7 @@ const app = express();
 app.use(express.static(path.join(__dirname, "../frontend")));
 
 app.use(cors({
-    origin: 'http://127.0.0.1:5502', // Match your frontend
+    origin: 'https://github.com/Nithingrandhi/findmysubsbackend.git', // Match your frontend
     credentials: true
 }));
 
