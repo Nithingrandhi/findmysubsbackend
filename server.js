@@ -9,7 +9,7 @@ const app = express();
 app.set('trust proxy', 1);
 
 app.use(cors({
-    origin: 'https://findmysubscrption.netlify.app', // Match your frontend
+    origin: 'https://findmysubscrption.netlify.app', 
     credentials: true,
     methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type']
@@ -26,26 +26,23 @@ app.use(session({
     resave: false,
     saveUninitialized: false,
     cookie: {
-      sameSite: 'none', // Allow cross-site cookies
-      secure: true      // Require HTTPS (your backend should use HTTPS)
+      sameSite: 'none', 
+      secure: true      
     }
 
 }));
 
-const db = mysql.createConnection({
-    host: "yamanote.proxy.rlwy.net",
-    user: "root",
-    password: "JUwBoVKMCtRJRbCYdQQCUjCoDyxjfCWv",
-    database: "railway",
-    port: 57354
-});
+const db = mysql.createPool({
+  host: "yamanote.proxy.rlwy.net",
+  user: "root",
+  password: "JUwBoVKMCtRJRbCYdQQCUjCoDyxjfCWv",
+  database: "railway",
+  port: 57354,
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
+}).promise();
 
-db.connect(err => {
-    if (err) throw err;
-    console.log("Connected to MySQL");
-});
-
-// ✅ Signup route
 app.post("/signup", (req, res) => {
     const { username, email, password } = req.body;
 
@@ -70,7 +67,6 @@ app.post("/signup", (req, res) => {
     });
 });
 
-// ✅ Login route
 app.post("/login", (req, res) => {
     console.log("Login attempt received:", req.body);
     const { email, password } = req.body;
@@ -91,10 +87,8 @@ app.post("/login", (req, res) => {
             return res.status(401).json({ message: "Invalid credentials" });
         }
 
-        // ✅ Set session value
         req.session.userId = results[0].id;
 
-        // ✅ Save session before responding
         req.session.save(err => {
             if (err) {
                 console.error("Session save error:", err);
@@ -111,7 +105,6 @@ app.post("/login", (req, res) => {
     });
 });
 
-// ✅ Add Subscription (protected)
 app.post("/subscriptions", (req, res) => {
     const userId = req.session.userId;
     if (!userId) {
@@ -140,7 +133,6 @@ app.post("/subscriptions", (req, res) => {
     });
 });
 
-// ✅ Get Subscriptions (protected)
 app.get("/subscriptions", (req, res) => {
     const userId = req.session.userId;
     if (!userId) {
@@ -187,9 +179,8 @@ app.get("/renewals", (req, res) => {
       const monthsMatch = sub.subscriptionbillingcycle.match(/\d+/);
       const cycleMonths = monthsMatch ? parseInt(monthsMatch[0], 10) : 0;
 
-      if (!cycleMonths) return; // skip if billing cycle is invalid
+      if (!cycleMonths) return; 
 
-      // Simulate recurring renewals
       let currentRenewal = new Date(startDate);
 
       while (currentRenewal.getFullYear() <= year &&
@@ -204,10 +195,8 @@ app.get("/renewals", (req, res) => {
             renewalMonth: rMonth,
             renewalYear: rYear
           });
-          break; // No need to check further if matched
+          break; 
         }
-
-        // Add billing cycle
         currentRenewal.setMonth(currentRenewal.getMonth() + cycleMonths);
       }
     });
@@ -219,7 +208,6 @@ app.get("/renewals", (req, res) => {
 
 
 
-// ✅ Start server
 const PORT = 5001;
 app.listen(PORT, () => {
     console.log(`Server running on ${PORT}`);
