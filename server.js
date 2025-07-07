@@ -6,7 +6,6 @@ const session = require("express-session");
 
 const app = express();
 app.set("trust proxy", 1);
-
 app.use(
   cors({
     origin: "https://findmysubscrption.netlify.app",
@@ -18,7 +17,6 @@ app.use(
 
 app.use(express.json());
 app.use(bodyParser.json());
-
 app.use(
   session({
     secret: "2100030184",
@@ -30,8 +28,9 @@ app.use(
     },
   })
 );
-const db = mysql
-  .createPool({
+let pool;
+function handleDisconnect() {
+  pool = mysql.createPool({
     host: "yamanote.proxy.rlwy.net",
     user: "root",
     password: "JUwBoVKMCtRJRbCYdQQCUjCoDyxjfCWv",
@@ -40,10 +39,44 @@ const db = mysql
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
-  })
-  .promise();
+  });
 
+  pool.on("error", function (err) {
+    console.error("DB connection error:", err);
+    if (err.code === "PROTOCOL_CONNECTION_LOST") {
+      console.log("🔁 Reconnecting to DB...");
+      handleDisconnect();
+    } else {
+      throw err;
+    }
+  });
+}
+handleDisconnect();
+const db = pool.promise();
 
+setInterval(() => {
+  db.query("SELECT 1").catch(() => {});
+}, 60000);
+
+app.post("/signup", async (req, res) => {
+  const { username, email, password } = req.body;
+  if (!username || !email || !password) {
+    return res.status(400).json({ message: "All fields are required" });
+  }
+
+  try {
+    const [users] = await db.query("SELECT * FROM users WHERE email = ?", [email]);
+    if (users.length > 0) {
+      return res.status(400).json({ message: "Email already exists" });
+    }
+
+    await db.query("INSERT INTO users (username, email, password) VALUES (?, ?, ?)", [username, email, password]);
+    res.status(200).json({ message: "Signup successful" });
+  } catch (err) {
+    console.error("Signup DB error:", err);
+    res.status(500).json({ message: "Database error" });
+  }
+});
 
 app.post("/login", async (req, res) => {
   const { email, password } = req.body;
@@ -52,10 +85,7 @@ app.post("/login", async (req, res) => {
   }
 
   try {
-    const [users] = await db.query(
-      "SELECT * FROM users WHERE email = ? AND password = ?",
-      [email, password]
-    );
+    const [users] = await db.query("SELECT * FROM users WHERE email = ? AND password = ?", [email, password]);
     if (users.length === 0) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
@@ -72,35 +102,9 @@ app.post("/login", async (req, res) => {
     res.status(500).json({ message: "Database error" });
   }
 });
-
-app.post("/signup", async (req, res) => {
-  const { username, email, password } = req.body;
-  if (!username || !email || !password) {
-    return res.status(400).json({ message: "All fields are required" });
-  }
-
-  try {
-    const [users] = await db.query("SELECT * FROM users WHERE email = ?", [email]);
-    if (users.length > 0) {
-      return res.status(400).json({ message: "Email already exists" });
-    }
-
-    await db.query(
-      "INSERT INTO users (username, email, password) VALUES (?, ?, ?)",
-      [username, email, password]
-    );
-    res.status(200).json({ message: "Signup successful" });
-  } catch (err) {
-    console.error("Signup DB error:", err);
-    res.status(500).json({ message: "Database error" });
-  }
-});
-
-
 app.post("/subscriptions", async (req, res) => {
   const userId = req.session.userId;
-  const { subscriptionname, subscriptiondate, subscriptionbillingcycle, subscriptioncost } =
-    req.body;
+  const { subscriptionname, subscriptiondate, subscriptionbillingcycle, subscriptioncost } = req.body;
 
   if (!userId) return res.status(401).send("Unauthorized");
   if (!subscriptionname || !subscriptiondate || !subscriptionbillingcycle || !subscriptioncost) {
@@ -123,22 +127,10 @@ app.post("/subscriptions", async (req, res) => {
 
 app.post("/split-subscription", async (req, res) => {
   const userId = req.session.userId;
-  const {
-    subscriptionname,
-    subscriptiondate,
-    subscriptionbillingcycle,
-    subscriptioncost,
-    numpeople,
-  } = req.body;
+  const { subscriptionname, subscriptiondate, subscriptionbillingcycle, subscriptioncost, numpeople } = req.body;
 
   if (!userId) return res.status(401).send("Unauthorized");
-  if (
-    !subscriptionname ||
-    !subscriptiondate ||
-    !subscriptionbillingcycle ||
-    !subscriptioncost ||
-    !numpeople
-  ) {
+  if (!subscriptionname || !subscriptiondate || !subscriptionbillingcycle || !subscriptioncost || !numpeople) {
     return res.status(400).json({ message: "All fields required" });
   }
 
@@ -158,7 +150,6 @@ app.post("/split-subscription", async (req, res) => {
     res.status(500).json({ message: "Database error" });
   }
 });
-
 app.get("/subscriptions", async (req, res) => {
   const userId = req.session.userId;
   if (!userId) return res.status(401).send("Unauthorized");
@@ -171,7 +162,6 @@ app.get("/subscriptions", async (req, res) => {
     res.status(500).send("Database error");
   }
 });
-
 app.get("/renewals", async (req, res) => {
   const { month, year } = req.query;
   const userId = req.session.userId;
@@ -221,7 +211,6 @@ app.get("/renewals", async (req, res) => {
     res.status(500).send("Database error");
   }
 });
-
 app.use((req, res) => {
   res.status(404).json({ message: "Endpoint not found" });
 });
