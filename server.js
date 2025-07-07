@@ -153,6 +153,50 @@ app.get("/subscriptions", (req, res) => {
     });
 });
 
+app.post("/split-subscription", (req, res) => {
+    const userId = req.session.userId;
+    if (!userId) {
+        console.log("Unauthorized access to POST /split-subscription");
+        return res.status(401).send("Unauthorized");
+    }
+
+    const {
+        subscriptionname,
+        subscriptiondate,
+        subscriptionbillingcycle,
+        subscriptioncost,
+        numpeople,
+        notes
+    } = req.body;
+
+    if (!subscriptionname || !subscriptiondate || !subscriptionbillingcycle || !subscriptioncost || !numpeople) {
+        return res.status(400).json({ message: "All fields are required for split subscription" });
+    }
+    const costPerPerson = (subscriptioncost / numpeople).toFixed(2);
+    const fullName = `${subscriptionname} (Split with ${numpeople})`;
+
+    const insertSubscription = `
+        INSERT INTO subscription (subscriptionname, subscriptiondate, subscriptionbillingcycle, subscriptioncost, user_id)
+        VALUES (?, ?, ?, ?, ?)
+    `;
+
+    db.query(
+        insertSubscription,
+        [fullName, subscriptiondate, subscriptionbillingcycle, subscriptioncost, userId],
+        (err, results) => {
+            if (err) {
+                console.error("Split subscription insert error:", err);
+                return res.status(500).json({ message: "Database error" });
+            }
+
+            res.status(200).json({
+                message: `Split subscription added successfully.`,
+                costPerPerson
+            });
+        }
+    );
+});
+
 app.get("/renewals", (req, res) => {
   const { month, year } = req.query;
   const userId = req.session.userId;
