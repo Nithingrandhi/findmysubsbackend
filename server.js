@@ -43,28 +43,7 @@ const db = mysql
   })
   .promise();
 
-app.post("/signup", async (req, res) => {
-  const { username, email, password } = req.body;
-  if (!username || !email || !password) {
-    return res.status(400).json({ message: "All fields are required" });
-  }
 
-  try {
-    const [users] = await db.query("SELECT * FROM users WHERE email = ?", [email]);
-    if (users.length > 0) {
-      return res.status(400).json({ message: "Email already exists" });
-    }
-
-    await db.query(
-      "INSERT INTO users (username, email, password) VALUES (?, ?, ?)",
-      [username, email, password]
-    );
-    res.status(200).json({ message: "Signup successful" });
-  } catch (err) {
-    console.error("Signup DB error:", err);
-    res.status(500).json({ message: "Database error" });
-  }
-});
 
 app.post("/login", async (req, res) => {
   const { email, password } = req.body;
@@ -93,6 +72,30 @@ app.post("/login", async (req, res) => {
     res.status(500).json({ message: "Database error" });
   }
 });
+
+app.post("/signup", async (req, res) => {
+  const { username, email, password } = req.body;
+  if (!username || !email || !password) {
+    return res.status(400).json({ message: "All fields are required" });
+  }
+
+  try {
+    const [users] = await db.query("SELECT * FROM users WHERE email = ?", [email]);
+    if (users.length > 0) {
+      return res.status(400).json({ message: "Email already exists" });
+    }
+
+    await db.query(
+      "INSERT INTO users (username, email, password) VALUES (?, ?, ?)",
+      [username, email, password]
+    );
+    res.status(200).json({ message: "Signup successful" });
+  } catch (err) {
+    console.error("Signup DB error:", err);
+    res.status(500).json({ message: "Database error" });
+  }
+});
+
 
 app.post("/subscriptions", async (req, res) => {
   const userId = req.session.userId;
