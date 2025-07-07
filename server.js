@@ -5,13 +5,12 @@ const mysql = require("mysql2");
 const session = require("express-session");
 
 const app = express();
-app.set("trust proxy", 1);
+app.set('trust proxy', 1);
 
-// Middleware
 app.use(cors({
   origin: 'https://findmysubscrption.netlify.app',
   credentials: true,
-  methods: ['GET', 'POST', 'OPTIONS'],
+  methods: ['GET', 'POST'],
   allowedHeaders: ['Content-Type']
 }));
 
@@ -28,7 +27,6 @@ app.use(session({
   }
 }));
 
-// MySQL connection pool
 const db = mysql.createPool({
   host: "yamanote.proxy.rlwy.net",
   user: "root",
@@ -38,9 +36,8 @@ const db = mysql.createPool({
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0
-}).promise();
+}).promise(); 
 
-// Signup route
 app.post("/signup", async (req, res) => {
   const { username, email, password } = req.body;
   if (!username || !email || !password) {
@@ -48,20 +45,20 @@ app.post("/signup", async (req, res) => {
   }
 
   try {
-    const [existing] = await db.query("SELECT * FROM users WHERE email = ?", [email]);
-    if (existing.length > 0) {
+    const [users] = await db.query("SELECT * FROM users WHERE email = ?", [email]);
+    if (users.length > 0) {
       return res.status(400).json({ message: "Email already exists" });
     }
 
     await db.query("INSERT INTO users (username, email, password) VALUES (?, ?, ?)", [username, email, password]);
     res.status(200).json({ message: "Signup successful" });
+
   } catch (err) {
     console.error("Signup DB error:", err);
     res.status(500).json({ message: "Database error" });
   }
 });
 
-// Login route
 app.post("/login", async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
@@ -75,31 +72,26 @@ app.post("/login", async (req, res) => {
     }
 
     req.session.userId = users[0].id;
-
     req.session.save(err => {
       if (err) {
-        console.error("Session save error:", err);
-        return res.status(500).json({ message: "Session error" });
+        return res.status(500).json({ message: "Session save failed" });
       }
-
-      res.setHeader("Access-Control-Allow-Credentials", "true");
       res.status(200).json({ message: "Login successful" });
     });
+
   } catch (err) {
     console.error("Login DB error:", err);
     res.status(500).json({ message: "Database error" });
   }
 });
 
-// Normal subscription
 app.post("/subscriptions", async (req, res) => {
   const userId = req.session.userId;
-  if (!userId) return res.status(401).send("Unauthorized");
-
   const { subscriptionname, subscriptiondate, subscriptionbillingcycle, subscriptioncost } = req.body;
 
+  if (!userId) return res.status(401).send("Unauthorized");
   if (!subscriptionname || !subscriptiondate || !subscriptionbillingcycle || !subscriptioncost) {
-    return res.status(400).json({ message: "All fields are required" });
+    return res.status(400).json({ message: "All fields required" });
   }
 
   try {
@@ -109,28 +101,20 @@ app.post("/subscriptions", async (req, res) => {
       [subscriptionname, subscriptiondate, subscriptionbillingcycle, subscriptioncost, userId]
     );
     res.status(200).json({ message: "Subscription added successfully" });
+
   } catch (err) {
-    console.error("Insert subscription error:", err);
+    console.error("Subscription DB error:", err);
     res.status(500).json({ message: "Database error" });
   }
 });
 
-// Split subscription
 app.post("/split-subscription", async (req, res) => {
   const userId = req.session.userId;
+  const { subscriptionname, subscriptiondate, subscriptionbillingcycle, subscriptioncost, numpeople } = req.body;
+
   if (!userId) return res.status(401).send("Unauthorized");
-
-  const {
-    subscriptionname,
-    subscriptiondate,
-    subscriptionbillingcycle,
-    subscriptioncost,
-    numpeople,
-    notes
-  } = req.body;
-
   if (!subscriptionname || !subscriptiondate || !subscriptionbillingcycle || !subscriptioncost || !numpeople) {
-    return res.status(400).json({ message: "All fields are required for split subscription" });
+    return res.status(400).json({ message: "All fields required" });
   }
 
   const costPerPerson = (subscriptioncost / numpeople).toFixed(2);
@@ -142,56 +126,49 @@ app.post("/split-subscription", async (req, res) => {
        VALUES (?, ?, ?, ?, ?)`,
       [fullName, subscriptiondate, subscriptionbillingcycle, subscriptioncost, userId]
     );
+    res.status(200).json({ message: "Split subscription added", costPerPerson });
 
-    res.status(200).json({
-      message: "Split subscription added successfully",
-      costPerPerson
-    });
   } catch (err) {
-    console.error("Insert split subscription error:", err);
+    console.error("Split subscription error:", err);
     res.status(500).json({ message: "Database error" });
   }
 });
 
-// Get subscriptions
 app.get("/subscriptions", async (req, res) => {
   const userId = req.session.userId;
   if (!userId) return res.status(401).send("Unauthorized");
 
   try {
-    const [results] = await db.query("SELECT * FROM subscription WHERE user_id = ?", [userId]);
-    res.json(results);
+    const [subs] = await db.query("SELECT * FROM subscription WHERE user_id = ?", [userId]);
+    res.json(subs);
+
   } catch (err) {
-    console.error("Get subscriptions error:", err);
+    console.error("Fetch subscriptions error:", err);
     res.status(500).send("Database error");
   }
 });
 
-// Get renewals
 app.get("/renewals", async (req, res) => {
   const { month, year } = req.query;
   const userId = req.session.userId;
   if (!userId) return res.status(401).send("Unauthorized");
 
   try {
-    const [results] = await db.query(
+    const [subs] = await db.query(
       `SELECT subscriptionname, subscriptiondate, subscriptionbillingcycle
-       FROM subscription WHERE user_id = ?`,
-      [userId]
-    );
+       FROM subscription WHERE user_id = ?`, [userId]);
 
     const filteredRenewals = [];
 
-    results.forEach(sub => {
+    subs.forEach(sub => {
       const startDate = new Date(sub.subscriptiondate);
       const monthsMatch = sub.subscriptionbillingcycle.match(/\d+/);
       const cycleMonths = monthsMatch ? parseInt(monthsMatch[0], 10) : 0;
       if (!cycleMonths) return;
 
       let currentRenewal = new Date(startDate);
-
       while (currentRenewal.getFullYear() <= year &&
-             (currentRenewal.getMonth() + 1) <= month) {
+            (currentRenewal.getMonth() + 1) <= month) {
         const rMonth = currentRenewal.getMonth() + 1;
         const rYear = currentRenewal.getFullYear();
 
@@ -204,19 +181,18 @@ app.get("/renewals", async (req, res) => {
           });
           break;
         }
-
         currentRenewal.setMonth(currentRenewal.getMonth() + cycleMonths);
       }
     });
 
     res.json(filteredRenewals);
   } catch (err) {
-    console.error("Renewals error:", err);
+    console.error("Renewal fetch error:", err);
     res.status(500).send("Database error");
   }
 });
 
-const PORT = process.env.PORT || 5001;
+const PORT = 5001;
 app.listen(PORT, () => {
-  console.log(`Server running on ${PORT}`);
+  console.log(`✅ Server running on ${PORT}`);
 });
